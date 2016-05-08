@@ -1,9 +1,11 @@
-const MINUTE = 60
-const HOUR = MINUTE * 60
-const DAY = HOUR * 24
-const WEEK = DAY * 7
-const MONTH = DAY * 30
-const YEAR = DAY * 365
+const UNIT_INTERVAL = {}
+UNIT_INTERVAL.SECOND = 1
+UNIT_INTERVAL.MINUTE = UNIT_INTERVAL.SECOND * 60
+UNIT_INTERVAL.HOUR = UNIT_INTERVAL.MINUTE * 60
+UNIT_INTERVAL.DAY = UNIT_INTERVAL.HOUR * 24
+UNIT_INTERVAL.WEEK = UNIT_INTERVAL.DAY * 7
+UNIT_INTERVAL.MONTH = UNIT_INTERVAL.DAY * 30
+UNIT_INTERVAL.YEAR = UNIT_INTERVAL.DAY * 365
 
 function pluralOrSingular(data, locale) {
   const count = Math.round(data)
@@ -15,9 +17,19 @@ function pluralOrSingular(data, locale) {
   return locale.replace(/%s/, count)
 }
 
+function canTimeago(seconds, targetStage, maxStage) {
+  const isOutOfMaxTime = !maxStage || seconds <= UNIT_INTERVAL[maxStage]
+
+  return seconds >= UNIT_INTERVAL[targetStage] && isOutOfMaxTime
+}
+
 export default function install(Vue, {
   name = 'timeago',
-  locale = null
+  locale = null,
+  maxtime = {
+    stage: null,
+    format: v => v
+  }
 } = {}) {
   if (!Array.isArray(locale)) {
     throw new TypeError('Expected locale to be an array')
@@ -26,25 +38,30 @@ export default function install(Vue, {
   Vue.filter(name, timeago)
 
   function timeago(then) {
-    then = new Date(then).getTime()
     const now = new Date().getTime()
-    const seconds = Math.round(now / 1000 - then / 1000)
+    const seconds = Math.round(now / 1000 - new Date(then).getTime() / 1000)
 
-    const ret
-      = seconds < MINUTE
-      ? pluralOrSingular(seconds, locale[0])
-      : seconds < HOUR
-      ? pluralOrSingular(seconds / MINUTE, locale[1])
-      : seconds < DAY
-      ? pluralOrSingular(seconds / HOUR, locale[2])
-      : seconds < WEEK
-      ? pluralOrSingular(seconds / DAY, locale[3])
-      : seconds < MONTH
-      ? pluralOrSingular(seconds / WEEK, locale[4])
-      : seconds < YEAR
-      ? pluralOrSingular(seconds / MONTH, locale[5])
-      : pluralOrSingular(seconds / YEAR, locale[6])
-
-    return ret
+    if (canTimeago(seconds, 'YEAR', maxtime.stage)) {
+      return pluralOrSingular(seconds / UNIT_INTERVAL.YEAR, locale[6])
+    }
+    if (canTimeago(seconds, 'MONTH', maxtime.stage)) {
+      return pluralOrSingular(seconds / UNIT_INTERVAL.MONTH, locale[5])
+    }
+    if (canTimeago(seconds, 'WEEK', maxtime.stage)) {
+      return pluralOrSingular(seconds / UNIT_INTERVAL.WEEK, locale[4])
+    }
+    if (canTimeago(seconds, 'DAY', maxtime.stage)) {
+      return pluralOrSingular(seconds / UNIT_INTERVAL.DAY, locale[3])
+    }
+    if (canTimeago(seconds, 'HOUR', maxtime.stage)) {
+      return pluralOrSingular(seconds / UNIT_INTERVAL.HOUR, locale[2])
+    }
+    if (canTimeago(seconds, 'MINUTE', maxtime.stage)) {
+      return pluralOrSingular(seconds / UNIT_INTERVAL.MINUTE, locale[1])
+    }
+    if (canTimeago(seconds, 'SECOND', maxtime.stage)) {
+      return pluralOrSingular(seconds / UNIT_INTERVAL.SECOND, locale[0])
+    }
+    return maxtime.format(then)
   }
 }
